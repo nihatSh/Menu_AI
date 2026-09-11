@@ -217,6 +217,7 @@ src/
     store.js           orders, feedback, AI call log (in memory)
     i18n.js            UI strings AZ / EN / RU
 scripts/ai-eval.mjs              golden-set evaluation
+scripts/find-photos.mjs          sources dish photos from Wikimedia Commons
 scripts/shoot.mjs                phone-viewport screenshots + overflow check
 scripts/probe.mjs                read computed styles from the live page
 tests/ai/scenarios.json          the 18 scenarios
@@ -226,11 +227,11 @@ tests/ai/scenarios.json          the 18 scenarios
 
 ## Known limits (next steps)
 
-- **No dish photography.** The menu follows a photography-led reference design
-  (`docs/reference/menu-reference.webp`) but the data has no images, so
-  `DishImage` falls back to an illustrated tile at the same size. Set
-  `photoUrl` on a dish and the real picture takes over with no layout change.
-  This is the biggest single visual gap.
+- **Dish photos are placeholders.** Every dish carries a real, freely-licensed
+  photograph from Wikimedia Commons (`npm run photos` to re-source,
+  `docs/PHOTO_CREDITS.md` for attribution). They depict the right dish but are
+  not this restaurant's own food - an owner replaces them by setting
+  `photoUrl`, and nothing else changes.
 - **Storage is in memory.** Orders and ratings reset when the dev server
   restarts. `lib/store.js` is the only file that touches storage, so swapping in
   PostgreSQL means rewriting that one file.
@@ -242,5 +243,6 @@ tests/ai/scenarios.json          the 18 scenarios
   Safari but not Firefox, and Azerbaijani recognition depends on the device.
 - The owner can toggle dishes on and off, but adding a brand-new dish still
   means editing `data/restaurants.js`.
-#   M e n u _ A I  
+#   M e n u _ A I 
+ 
  

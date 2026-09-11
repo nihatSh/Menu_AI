@@ -1,11 +1,21 @@
 // Demo data. In production this lives in PostgreSQL and the owner edits it
 // from the dashboard. The shape below is the contract the whole app relies on.
 //
+// Photographs come from photos.json, sourced from Wikimedia Commons and
+// checked by eye rather than by keyword - see scripts/find-photos.mjs and
+// docs/PHOTO_CREDITS.md. They are placeholders for the demo; a real
+// restaurant replaces them with pictures of its own food.
+//
 // A dish carries everything the AI needs to reason about it: nutrition for the
 // fitness features, allergens for the safety filter, prepMinutes for honest
 // wait times, temp/tags for the weather logic, and kidFriendly for kids mode.
 
-export const restaurants = [
+import { dishPhotos } from "./photos.js";
+
+const withPhotos = (menu) =>
+  menu.map((d) => (dishPhotos[d.id] ? { ...d, photoUrl: dishPhotos[d.id] } : d));
+
+const RESTAURANTS = [
   {
     slug: "sehrli-tendir",
     name: "Səhrli Təndir",
@@ -340,6 +350,8 @@ export const restaurants = [
     ],
   },
 ];
+
+export const restaurants = RESTAURANTS.map((r) => ({ ...r, menu: withPhotos(r.menu) }));
 
 export function getRestaurant(slug) {
   return restaurants.find((r) => r.slug === slug) || null;

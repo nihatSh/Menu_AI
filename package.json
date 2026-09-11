@@ -9,7 +9,9 @@
     "lint": "next lint",
     "ai:eval": "node --no-warnings scripts/ai-eval.mjs",
     "shoot": "node --no-warnings scripts/shoot.mjs",
-    "probe": "node --no-warnings scripts/probe.mjs"
+    "probe": "node --no-warnings scripts/probe.mjs",
+    "photos": "node --no-warnings scripts/find-photos.mjs",
+    "photos:verify": "node --no-warnings scripts/find-photos.mjs --verify"
   },
   "dependencies": {
     "@google/genai": "^2.22.0",
