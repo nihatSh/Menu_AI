@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /*
+   * LIGHT — a cool near-neutral paper. Deliberately not the warm cream/beige
+   * family: see DESIGN_AUDIT.md. Values are space-separated RGB so Tailwind
+   * can apply opacity via <alpha-value>.
+   */
+  :root {
+    --paper: 251 251 250;
+    --raised: 255 255 255;
+    --sunken: 244 244 245;
+    --ink: 20 22 26;
+    --muted: 91 96 104;
+    --faint: 138 143 151;
+    --line: 228 228 231;
+    --shadow: 20 22 26;
+
+    /* Fallback accent. Each restaurant overrides these three at the root of
+       its own page, so the accent is the only saturated colour on screen. */
+    --accent: 32 96 84;
+    --accent-ink: 255 255 255;
+    --accent-soft: 236 245 242;
+
+    --warn: 146 87 17;
+    --warn-soft: 253 244 228;
+    --danger: 168 41 44;
+    --danger-soft: 253 238 238;
+    --good: 27 105 73;
+    --good-soft: 232 246 239;
+
+    color-scheme: light;
+  }
+
+  /*
+   * DARK — a true low-chroma charcoal, not a tinted navy and not pure black.
+   * A restaurant at 9pm is a dark room; this is the mode most guests see.
+   */
+  .dark {
+    --paper: 14 16 18;
+    --raised: 22 25 29;
+    --sunken: 30 34 39;
+    --ink: 242 243 244;
+    --muted: 160 166 174;
+    --faint: 115 121 130;
+    --line: 42 47 54;
+    --shadow: 0 0 0;
+
+    --accent: 74 176 150;
+    --accent-ink: 10 20 17;
+    --accent-soft: 25 44 39;
+
+    --warn: 226 169 84;
+    --warn-soft: 47 38 22;
+    --danger: 240 124 124;
+    --danger-soft: 54 28 28;
+    --good: 108 202 160;
+    --good-soft: 22 44 36;
+
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    /* Stops iOS Safari from inflating font sizes in landscape. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Numbers align in columns wherever they appear. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* One visible focus treatment for the whole app (taste-skill 4.5). */
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.22);
+  }
+}
+
+@layer components {
+  /* Horizontal strips (category rail) scroll without a visible bar. */
+  .no-bar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Bottom padding that clears the iPhone home indicator. */
+  .pb-safe {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /*
+   * Hunger range input. The track is painted inline (a gradient whose stop
+   * follows the value) so fill and thumb stay locked together; this rule only
+   * handles the shape and the thumb, which cannot be done with utilities.
+   */
+  .hunger-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+  }
+  .hunger-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: rgb(var(--raised));
+    border: 3px solid rgb(var(--accent));
+    box-shadow: 0 1px 3px rgb(var(--shadow) / 0.28);
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .hunger-range::-webkit-slider-thumb:active {
+    transform: scale(1.12);
+  }
+  .hunger-range::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: rgb(var(--raised));
+    border: 3px solid rgb(var(--accent));
+    box-shadow: 0 1px 3px rgb(var(--shadow) / 0.28);
+  }
+  .hunger-range::-moz-range-track {
+    background: transparent;
+  }
+  .hunger-range:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgb(var(--accent) / 0.24);
+  }
+
+  /* Skeleton fill used while the menu and orders load. */
+  .skeleton {
+    background-image: linear-gradient(
+      90deg,
+      rgb(var(--sunken)) 0%,
+      rgb(var(--line)) 50%,
+      rgb(var(--sunken)) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer rounded-control;
+  }
+}
+
+/*
+ * Every animation in the app collapses here. taste-skill 6.B makes this
+ * mandatory above MOTION_INTENSITY 3; this app sits at 5.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
