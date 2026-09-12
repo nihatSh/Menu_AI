@@ -88,7 +88,7 @@ export default function DishSheet({
       className="fixed inset-0 z-sheet mx-auto flex max-w-lg flex-col bg-paper outline-none animate-fade-in"
     >
       {/* Hero image, running to all three top edges. */}
-      <div className="relative h-[38dvh] min-h-[240px] shrink-0">
+      <div className="relative h-[44dvh] min-h-[280px] shrink-0">
         <DishImage dish={dish} alt={name} rounded="rounded-none" glyphClass="text-[120px]" />
 
         <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4">

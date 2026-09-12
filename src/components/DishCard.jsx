@@ -40,7 +40,7 @@ export default function DishCard({
   return (
     <article
       className={cx(
-        "relative flex gap-3 rounded-card bg-raised p-2.5 shadow-card",
+        "relative flex overflow-hidden rounded-card bg-raised shadow-card",
         "transition-shadow duration-200 ease-out hover:shadow-lift",
         animate && "animate-rise-in"
       )}
@@ -49,12 +49,18 @@ export default function DishCard({
       <button
         onClick={() => onOpen(dish)}
         aria-label={strings?.viewDish?.replace("{dish}", name) || `View ${name}`}
-        className="h-[84px] w-[84px] shrink-0"
+        className="w-[112px] shrink-0 self-stretch"
       >
-        <DishImage dish={dish} alt={name} glyphClass="text-[34px]" />
+        <DishImage
+          dish={dish}
+          alt={name}
+          rounded="rounded-none"
+          glyphClass="text-[44px]"
+          className="min-h-[112px]"
+        />
       </button>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col p-2.5">
         <div className="flex items-start justify-between gap-1.5">
           <button
             onClick={() => onOpen(dish)}
