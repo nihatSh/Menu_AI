@@ -44,7 +44,10 @@ layout viewport in headless mode, so a plain `--screenshot` silently renders at
 computed styles from the live page.
 
 The design system and the reasoning behind it are in
-[DESIGN_AUDIT.md](DESIGN_AUDIT.md).
+[DESIGN_AUDIT.md](DESIGN_AUDIT.md). **If you are an agent or a developer picking
+this project up, start with [HANDOFF.md](HANDOFF.md)** — it carries the
+decisions already made, the architecture, and the environment gotchas that
+otherwise cost hours.
 
 ### Check the AI's answers
 
