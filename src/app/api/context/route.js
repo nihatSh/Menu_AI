@@ -2,7 +2,7 @@
 // The guest UI polls this so the banners stay honest without a websocket.
 
 import { getRestaurant } from "@/data/restaurants";
-import { kitchenLoad, getSoldOut } from "@/lib/store";
+import { kitchenLoad, getSoldOut, popularDishIds } from "@/lib/store";
 import { getWeather } from "@/lib/weather";
 import { partOfDayFor } from "@/lib/menu";
 
@@ -21,5 +21,6 @@ export async function GET(req) {
     partOfDay: partOfDayFor(new Date()),
     kitchen: kitchenLoad(slug),
     soldOut: getSoldOut(slug),
+    popular: popularDishIds(slug),
   });
 }

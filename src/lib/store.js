@@ -13,6 +13,7 @@ function db() {
       aiCalls: [], // one row per /api/chat call - see logAiCall()
       unmet: [], // requests the AI could not satisfy - owner demand signal
       chatLog: new Map(), // sessionKey -> [{role, content, at}] server-side history
+      favourites: new Map(), // slug -> Map(dishId -> Set(guestId))
       seq: 1,
     };
   }
@@ -184,6 +185,45 @@ export function kitchenLoad(slug) {
   if (dishes >= 14) level = "slammed";
   else if (dishes >= 6) level = "busy";
   return { activeOrders: active.length, queuedDishes: dishes, level, extraMinutes: level === "slammed" ? 15 : level === "busy" ? 7 : 0 };
+}
+
+// ---------------------------------------------------------------------------
+// Favourite counts. The menu shows "how many people saved this", so the number
+// has to be real - it is keyed by device so one guest cannot inflate it.
+// ---------------------------------------------------------------------------
+
+function favMap(slug) {
+  const d = db();
+  if (!d.favourites.has(slug)) d.favourites.set(slug, new Map());
+  return d.favourites.get(slug);
+}
+
+export function toggleFavouriteCount({ slug, dishId, guestId, on }) {
+  const map = favMap(slug);
+  if (!map.has(dishId)) map.set(dishId, new Set());
+  const set = map.get(dishId);
+  if (on) set.add(guestId);
+  else set.delete(guestId);
+  return set.size;
+}
+
+export function favouriteCounts(slug) {
+  const out = {};
+  for (const [dishId, set] of favMap(slug)) out[dishId] = set.size;
+  return out;
+}
+
+/** Most-ordered dish ids first - drives the "Popular" tab. */
+export function popularDishIds(slug, limit = 12) {
+  const tally = {};
+  for (const o of listOrders(slug)) {
+    if (o.status === "cancelled") continue;
+    for (const i of o.items) tally[i.dishId] = (tally[i.dishId] || 0) + i.qty;
+  }
+  return Object.entries(tally)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([id]) => id);
 }
 
 export function addFeedback({ slug, dishId, score }) {

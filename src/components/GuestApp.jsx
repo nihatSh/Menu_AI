@@ -10,6 +10,8 @@ import {
   EyeSlash,
   MagnifyingGlass,
   X,
+  Star,
+  Heart,
   FirstAid,
   CheckCircle,
 } from "@phosphor-icons/react";
@@ -27,7 +29,7 @@ import {
 import { accentVars, readTheme, applyTheme } from "@/lib/theme";
 import { currentPhase, primaryAction, estimateWait } from "@/lib/journey";
 
-import DishCard from "./DishCard";
+import DishRow from "./DishRow";
 import DishSheet from "./DishSheet";
 import AiWaiter from "./AiWaiter";
 import ProfileSheet from "./ProfileSheet";
@@ -56,6 +58,8 @@ export default function GuestApp({ restaurant, table }) {
   const [me, setMe] = useState(null);
   const [live, setLive] = useState(null);
   const [scores, setScores] = useState({});
+  const [favCounts, setFavCounts] = useState({});
+  const [lens, setLens] = useState("all"); // all | popular | favourites
   const [toast, setToast] = useState(null);
   const [pendingAsk, setPendingAsk] = useState(null);
   const [dismissedAllergyPrompt, setDismissedAllergyPrompt] = useState(false);
@@ -66,7 +70,16 @@ export default function GuestApp({ restaurant, table }) {
   const lang = profile.lang || "en";
   const strings = t(lang);
 
-  useEffect(() => setMode(readTheme()), []);
+  // Resolve the theme once on mount and write it to BOTH the state and the
+  // document. Setting state alone let the two drift apart - the icon could say
+  // "dark" while the page rendered light - whenever the pre-paint bootstrap and
+  // readTheme() disagreed, which happens if stored preferences are cleared
+  // between the two.
+  useEffect(() => {
+    const resolved = readTheme();
+    setMode(resolved);
+    applyTheme(resolved);
+  }, []);
 
   useEffect(() => {
     setProfile((p) => rememberVisit(p, restaurant.slug));
@@ -116,6 +129,10 @@ export default function GuestApp({ restaurant, table }) {
       .then((r) => r.json())
       .then((d) => setScores(d.scores || {}))
       .catch(() => {});
+    fetch(`/api/favourites?slug=${restaurant.slug}`)
+      .then((r) => r.json())
+      .then((d) => setFavCounts(d.counts || {}))
+      .catch(() => {});
   }, [restaurant.slug]);
 
   useEffect(() => {
@@ -123,6 +140,7 @@ export default function GuestApp({ restaurant, table }) {
   }, [searching]);
 
   const soldOut = live?.soldOut || [];
+  const popular = live?.popular || [];
   const weather = live?.weather || null;
   const kitchen = live?.kitchen || { level: "calm", extraMinutes: 0 };
   const extraMinutes = kitchen.extraMinutes || 0;
@@ -161,6 +179,24 @@ export default function GuestApp({ restaurant, table }) {
   const sections = useMemo(() => {
     const rank = (list) => scoreDishes(list, ranker).map((x) => x.dish);
 
+    // Popular and Favourites are their own single lists - grouping five
+    // saved dishes back into categories would add structure, not clarity.
+    if (lens === "favourites") {
+      return [
+        {
+          key: "favourites",
+          title: null,
+          dishes: matching.filter((d) => profile.favourites.includes(d.id)),
+        },
+      ];
+    }
+    if (lens === "popular") {
+      const ordered = popular.map((id) => matching.find((d) => d.id === id)).filter(Boolean);
+      // Before anyone has ordered, fall back to what the AI would rank highest
+      // so the tab is never an empty shelf.
+      return [{ key: "popular", title: null, dishes: ordered.length ? ordered : rank(matching).slice(0, 8) }];
+    }
+
     if (q || category !== "all") {
       const list = category === "all" ? matching : matching.filter((d) => d.category === category);
       return [{ key: "flat", title: null, dishes: rank(list) }];
@@ -170,9 +206,12 @@ export default function GuestApp({ restaurant, table }) {
     return order
       .map((c) => ({ key: c, title: c, dishes: rank(safe.filter((d) => d.category === c)) }))
       .filter((s) => s.dishes.length > 0);
-  }, [q, category, matching, safe, ranker]);
+  }, [q, category, matching, safe, ranker, lens, profile.favourites, popular]);
 
   const visibleCount = sections.reduce((n, s) => n + s.dishes.length, 0);
+  // The heading under "Menu" names whatever is actually on screen.
+  const lensTitle =
+    lens === "favourites" ? strings.favourites : lens === "popular" ? strings.popular : null;
   const totals = cartTotals(cart);
 
   const myOrders = useMemo(
@@ -262,7 +301,18 @@ export default function GuestApp({ restaurant, table }) {
   }
 
   function favourite(dishId) {
+    const willBeOn = !profile.favourites.includes(dishId);
     setProfile((p) => toggleFavourite(p, dishId));
+    // Optimistic, then reconciled with the server's authoritative count.
+    setFavCounts((c) => ({ ...c, [dishId]: Math.max(0, (c[dishId] || 0) + (willBeOn ? 1 : -1)) }));
+    fetch("/api/favourites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: restaurant.slug, dishId, on: willBeOn }),
+    })
+      .then((r) => r.json())
+      .then((d) => d.counts && setFavCounts(d.counts))
+      .catch(() => {});
   }
 
   function askAbout(dish) {
@@ -486,90 +536,145 @@ export default function GuestApp({ restaurant, table }) {
         )}
 
         {tab === "menu" && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              {searching ? (
-                <div className="flex flex-1 items-center rounded-full bg-sunken pr-1">
-                  <MagnifyingGlass size={15} weight="bold" className="ml-3 shrink-0 text-faint" />
-                  <input
-                    ref={searchRef}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={strings.searchPlaceholder}
-                    aria-label={strings.searchPlaceholder}
-                    className="min-w-0 flex-1 bg-transparent px-2.5 py-2.5 text-[13.5px] outline-none placeholder:text-faint"
-                  />
+          <div>
+            {/* Popular / Favourites, as in the reference: two halves split by a
+                rule, each carrying its own count. */}
+            <div className="-mx-4 mb-3 flex border-y border-line">
+              {[
+                { key: "popular", icon: Star, label: strings.popular, count: null },
+                {
+                  key: "favourites",
+                  icon: Heart,
+                  label: strings.favourites,
+                  count: profile.favourites.length,
+                },
+              ].map(({ key, icon: Icon, label, count }, i) => {
+                const on = lens === key;
+                return (
                   <button
-                    onClick={() => {
-                      setQuery("");
-                      setSearching(false);
-                    }}
-                    aria-label={strings.close}
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted"
+                    key={key}
+                    onClick={() => setLens(on ? "all" : key)}
+                    aria-pressed={on}
+                    className={cx(
+                      "flex flex-1 items-center justify-center gap-2 py-3 text-[13.5px] font-semibold",
+                      "transition-colors duration-200",
+                      i > 0 && "border-l border-line",
+                      on ? "text-accent" : "text-muted"
+                    )}
                   >
-                    <X size={15} weight="bold" />
+                    <Icon size={16} weight={on ? "fill" : "regular"} />
+                    {/* No line break between the two, or JSX inserts a space
+                        before the colon. */}
+                    <span>
+                      {label}
+                      {count !== null && <span className="tnum font-bold">: {count}</span>}
+                    </span>
                   </button>
-                </div>
-              ) : (
-                <>
-                  <div className="no-bar -ml-4 flex min-w-0 flex-1 gap-1.5 overflow-x-auto pl-4 pr-1">
-                    {categories.map((c) => {
-                      const on = category === c;
-                      // Each category carries the glyph of its first dish, the
-                      // reference's photo-in-pill treatment.
-                      const face = c === "all" ? null : safe.find((d) => d.category === c);
-                      return (
-                        <button
-                          key={c}
-                          onClick={() => setCategory(c)}
-                          aria-pressed={on}
-                          className={cx(
-                            "inline-flex shrink-0 items-center gap-1.5 rounded-full py-1.5 text-[13px] font-medium",
-                            "transition-colors duration-200 ease-out active:scale-[0.96]",
-                            face ? "pl-1.5 pr-3.5" : "px-3.5",
-                            on ? "bg-accent text-accent-ink" : "bg-sunken text-muted hover:text-ink"
-                          )}
-                        >
-                          {face && (
-                            <span
-                              aria-hidden="true"
-                              className={cx(
-                                "grid h-6 w-6 place-items-center rounded-full text-[13px]",
-                                on ? "bg-accent-ink/20" : "bg-raised"
-                              )}
-                            >
-                              {face.emoji}
-                            </span>
-                          )}
-                          {c === "all" ? strings.all : c}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <button
-                    onClick={() => setSearching(true)}
-                    aria-label={strings.searchPlaceholder}
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sunken text-muted transition-colors hover:text-ink"
-                  >
-                    <MagnifyingGlass size={16} weight="bold" />
-                  </button>
-                </>
-              )}
+                );
+              })}
             </div>
 
+            {/* Category rail. Text-only pills, the active one on a tint of the
+                accent. Hidden while a lens is active, since the lens already
+                decides what is on screen. */}
+            {lens === "all" && (
+              <div className="mb-1 flex items-center gap-2">
+                {searching ? (
+                  <div className="flex flex-1 items-center rounded-control border border-line bg-raised pr-1">
+                    <MagnifyingGlass size={15} weight="bold" className="ml-3 shrink-0 text-faint" />
+                    <input
+                      ref={searchRef}
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={strings.searchPlaceholder}
+                      aria-label={strings.searchPlaceholder}
+                      className="min-w-0 flex-1 bg-transparent px-2.5 py-2.5 text-[13.5px] outline-none placeholder:text-faint"
+                    />
+                    <button
+                      onClick={() => {
+                        setQuery("");
+                        setSearching(false);
+                      }}
+                      aria-label={strings.close}
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted"
+                    >
+                      <X size={15} weight="bold" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="no-bar -ml-4 flex min-w-0 flex-1 gap-1 overflow-x-auto pl-4 pr-1">
+                      {categories.map((c) => {
+                        const on = category === c;
+                        return (
+                          <button
+                            key={c}
+                            onClick={() => setCategory(c)}
+                            aria-pressed={on}
+                            className={cx(
+                              "shrink-0 rounded-control px-2.5 py-1.5 text-[13.5px] transition-colors duration-200",
+                              on
+                                ? "bg-accent-soft font-bold text-accent"
+                                : "font-semibold text-muted hover:text-ink"
+                            )}
+                          >
+                            {c === "all" ? strings.all : c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setSearching(true)}
+                      aria-label={strings.searchPlaceholder}
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-control border border-line text-muted transition-colors hover:text-ink"
+                    >
+                      <MagnifyingGlass size={15} weight="bold" />
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* The masthead: "Menu" in ink, then what you are actually looking
+                at underneath, in the accent. */}
+            <header className="pt-3">
+              <h2 className="text-[28px] font-bold leading-none tracking-[-0.03em]">
+                {strings.menuTitle}
+              </h2>
+              <p className="mt-1 text-[22px] font-bold leading-tight tracking-[-0.02em] text-accent">
+                {lensTitle || (category === "all" ? strings.all : category)}
+              </p>
+            </header>
+
             {loading ? (
-              <div className="space-y-2.5" aria-busy="true" aria-label={strings.loading}>
+              <div className="mt-4 space-y-4" aria-busy="true" aria-label={strings.loading}>
                 <DishSkeleton />
                 <DishSkeleton />
                 <DishSkeleton />
               </div>
             ) : visibleCount === 0 ? (
               <EmptyState
-                icon={q ? MagnifyingGlass : EyeSlash}
-                title={q ? strings.noMatches : strings.nothingHere}
-                body={q ? strings.noMatchesBody : strings.nothingHereBody}
+                icon={lens === "favourites" ? Heart : q ? MagnifyingGlass : EyeSlash}
+                title={
+                  lens === "favourites"
+                    ? strings.noFavourites
+                    : q
+                    ? strings.noMatches
+                    : strings.nothingHere
+                }
+                body={
+                  lens === "favourites"
+                    ? strings.noFavouritesBody
+                    : q
+                    ? strings.noMatchesBody
+                    : strings.nothingHereBody
+                }
                 action={
-                  q ? (
+                  lens !== "all" ? (
+                    <Button variant="soft" pill onClick={() => setLens("all")}>
+                      {strings.backToMenu}
+                    </Button>
+                  ) : q ? (
                     <Button variant="soft" pill onClick={() => setQuery("")}>
                       {strings.clearSearch}
                     </Button>
@@ -582,36 +687,36 @@ export default function GuestApp({ restaurant, table }) {
               />
             ) : (
               sections.map((section) => (
-                <section key={section.key} className="space-y-2.5">
+                <section key={section.key}>
                   {section.title && (
-                    // Sticky so a long scroll always says which part of the
-                    // menu you are in.
-                    <h2 className="sticky top-0 z-bar -mx-4 bg-paper/95 px-4 py-2 text-[12px] font-semibold uppercase tracking-wide text-faint backdrop-blur-md">
+                    <h3 className="sticky top-0 z-bar -mx-4 mt-2 bg-paper/95 px-4 py-2 text-[13px] font-bold uppercase tracking-wide text-faint backdrop-blur-md">
                       {section.title}
-                      <span className="tnum ml-1.5 font-normal normal-case">
-                        {section.dishes.length}
-                      </span>
-                    </h2>
+                    </h3>
                   )}
-                  {section.dishes.map((d, i) => (
-                    <DishCard
-                      key={d.id}
-                      dish={d}
-                      lang={lang}
-                      strings={strings}
-                      currency={restaurant.currency}
-                      extraMinutes={extraMinutes}
-                      score={scores[d.id]}
-                      inCart={cart.find((i2) => i2.dishId === d.id)?.qty || 0}
-                      isFavourite={profile.favourites.includes(d.id)}
-                      onToggleFavourite={favourite}
-                      onAdd={addToCart}
-                      onSetQty={setQty}
-                      onOpen={setOpenDish}
-                      index={i}
-                      animate
-                    />
-                  ))}
+                  {/* Dashed rules between rows instead of cards - a menu reads
+                      as a list, not as a deck. */}
+                  <div className="divide-y divide-dashed divide-line">
+                    {section.dishes.map((d, i) => (
+                      <DishRow
+                        key={d.id}
+                        dish={d}
+                        lang={lang}
+                        strings={strings}
+                        currency={restaurant.currency}
+                        extraMinutes={extraMinutes}
+                        score={scores[d.id]}
+                        favouriteCount={favCounts[d.id] || 0}
+                        isFavourite={profile.favourites.includes(d.id)}
+                        inCart={cart.find((i2) => i2.dishId === d.id)?.qty || 0}
+                        onToggleFavourite={favourite}
+                        onAdd={addToCart}
+                        onSetQty={setQty}
+                        onOpen={setOpenDish}
+                        index={i}
+                        animate
+                      />
+                    ))}
+                  </div>
                 </section>
               ))
             )}
